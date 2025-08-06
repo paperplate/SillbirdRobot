@@ -1,38 +1,6 @@
-#include "sillbirdGPIO.hxx"
+#include "GPIO_Output.hxx"
 
 namespace sillbird {
-
-GPIO_Input::GPIO_Input(const gpio_num_t pin, const bool activeLow) {
-    _init(pin, activeLow);
-}
-
-GPIO_Input::GPIO_Input(){}
-
-esp_err_t GPIO_Input::init(const gpio_num_t pin, const bool activeLow) {
-    return _init(pin, activeLow);
-}
-
-int GPIO_Input::read() {
-    return m_active_low ? !gpio_get_level(m_pin) : gpio_get_level(m_pin);
-}
-
-esp_err_t GPIO_Input::_init(const gpio_num_t pin, const bool activeLow) {
-    esp_err_t status {ESP_OK};
-
-    m_active_low = activeLow;
-    m_pin = pin;
-
-    gpio_config_t cfg;
-    cfg.pin_bit_mask = 1ULL << pin;
-    cfg.mode = GPIO_MODE_INPUT;
-    cfg.pull_up_en = GPIO_PULLUP_DISABLE;
-    cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    cfg.intr_type = GPIO_INTR_POSEDGE;
-
-    status |= gpio_config(&cfg);
-
-    return status;
-}
 
 GPIO_Output::GPIO_Output(const gpio_num_t pin, const bool activeLow) {
     _init(pin, activeLow);
