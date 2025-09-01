@@ -16,6 +16,7 @@ public:
 
 public:
     int m_level = 0;
+    gpio_num_t m_pin;
     esp_err_t _init(const gpio_num_t pin, const bool activeLow);
 };
 

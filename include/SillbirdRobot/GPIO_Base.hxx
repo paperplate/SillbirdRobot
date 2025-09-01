@@ -9,7 +9,7 @@ ESP_EVENT_DECLARE_BASE(INPUT_EVENTS);
 
 class GPIO_Base {
 protected:
-    gpio_num_t m_pin;
+    //gpio_num_t m_pin;
     bool m_active_low;
 };
 
