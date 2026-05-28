@@ -16,6 +16,6 @@ include(${IDF_PATH})
 
 
 project(SillbirdRobot
-  LANGUAGES CXX C
+  LANGUAGES CXX 
 )
 

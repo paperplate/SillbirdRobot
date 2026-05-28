@@ -1,54 +1,77 @@
 #include <Gpio.hxx>
-// #include <driver/gpio.h>
+#include <StepperMotor.hxx>
+#include <cstdlib>
 #include <esp_log.h>
+#include <expected>
 #include <freertos/FreeRTOS.h>
-// #include <freertos/task.h>
-// #include <hal/gpio_types.h>
-// #include <inttypes.h>
-#include <memory>
-// #include <sdkconfig.h>
-// #include <soc/gpio_num.h>
 
-// #include <GPIO_Input.hxx>
-// #include <GPIO_Output.hxx>
-// #include <Level.hxx>
-// #include <StepperMotor.hxx>
+// config block
+namespace sillbird {
+using namespace gpio;
+// LED config
+constexpr GpioConfig ledConfig{.mPin = 2, .mMode = Mode::Output};
+// Button config
+constexpr gpio::GpioConfig buttonConfig{
+    .mPin = 13, .mMode = Mode::Input, .mPull = Pull::Up};
 
-// std::unique_ptr<sillbird::GPIO_Input> gButton;
-// std::unique_ptr<sillbird::GPIO_Output> gLed;
-std::unique_ptr<sillbird::Gpio> gButton;
-std::unique_ptr<sillbird::Gpio> gLed;
+// Motor config
+constexpr GpioConfig mototPin1{.mPin = 25, .mMode = Mode::Output};
+constexpr GpioConfig mototPin2{.mPin = 26, .mMode = Mode::Output};
+constexpr GpioConfig mototPin3{.mPin = 27, .mMode = Mode::Output};
+constexpr GpioConfig mototPin4{.mPin = 14, .mMode = Mode::Output};
+} // namespace sillbird
 
-void setup() {
-  using namespace sillbird;
-  gButton = std::make_unique<Gpio>(13);
-  bool res =
-      gButton->Init(Gpio::Mode::Input, Gpio::Pull::Up, Gpio::IntrType::Rising);
-  ESP_LOGI(__func__, "Init GPIO button %s", res ? "Success" : "Failed");
-  gLed = std::make_unique<Gpio>(2);
-  res = gLed->Init(Gpio::Mode::Output);
-  ESP_LOGI(__func__, "Init GPIO led %s", res ? "Success" : "Failed");
-  // gButton = std::make_unique<sillbird::GPIO_Input>(GPIO_NUM_13, true);
-  // gLed = std::make_unique<sillbird::GPIO_Output>(GPIO_NUM_2, false);
-}
+namespace sg = sillbird::gpio;
+using gLed = sg::Gpio<sillbird::ledConfig>;
+using gButton = sg::Gpio<sillbird::buttonConfig>;
+using Motor = sillbird::StepperMotor<
+    sg::Gpio<sillbird::mototPin1>, sg::Gpio<sillbird::mototPin2>,
+    sg::Gpio<sillbird::mototPin3>, sg::Gpio<sillbird::mototPin4>>;
 
-void run() {
-  vTaskDelay(pdMS_TO_TICKS(200));
-  if (gButton->GetLevel() == sillbird::Gpio::Level::Low) {
-    gLed->SetLevel(sillbird::Gpio::Level::High);
-  } else {
-    gLed->SetLevel(sillbird::Gpio::Level::Low);
+class Application final {
+public:
+  Application(Motor motor) : mMotor(motor) {}
+  std::expected<void, sillbird::gpio::GpioError> setup() {
+    using namespace sillbird::gpio;
+    if (!gLed::Init()) {
+      ESP_LOGI(__func__, "Init GPIO led: Failed");
+      return std::unexpected(GpioError::InitFailed);
+    }
+    ESP_LOGI(__func__, "Init GPIO led: Success");
+    if (!gButton::Init()) {
+      ESP_LOGI(__func__, "Init GPIO button: Failed");
+      return std::unexpected(GpioError::InitFailed);
+    }
+    ESP_LOGI(__func__, "Init GPIO button: Success");
+    return {};
   }
-  /*if (gButton->GetLevel() == sillbird::Level::LOW) {
-    gLed->SetLevel(sillbird::Level::HIGH);
-  } else {
-    gLed->SetLevel(sillbird::Level::LOW);
-  }*/
-}
+
+  void run() {
+    using namespace sillbird::gpio;
+    while (true) {
+      if (gButton::GetLevel() == Level::Low) {
+        gLed::SetLevel(Level::High);
+        mMotor.Move(sillbird::stepperMotor::MoveTypes::FULL, 200, 10);
+      } else {
+        gLed::SetLevel(Level::Low);
+      }
+      vTaskDelay(pdMS_TO_TICKS(200));
+    }
+  }
+
+private:
+  Motor mMotor;
+};
 
 extern "C" void app_main() {
-  setup();
-  while (true) {
-    run();
+  auto motor = Motor::Init();
+  if (!motor) {
+    exit(EXIT_FAILURE);
   }
+
+  Application app(motor.value());
+  if (!app.setup()) {
+    exit(EXIT_FAILURE);
+  }
+  app.run();
 }

@@ -1,32 +1,44 @@
 #pragma once
 
-#include <functional>
+#include <Hal.hxx>
+#include <Types.hxx>
 
-namespace sillbird {
+#include <expected>
 
-class Gpio {
+namespace sillbird::gpio {
+
+template <GpioConfig config>
+concept OutputCapable =
+    config.mMode == Mode::InputOutput || config.mMode == Mode::Output;
+
+template <GpioConfig config>
+concept InputCapable =
+    config.mMode == Mode::InputOutput || config.mMode == Mode::Input;
+
+template <GpioConfig config> class Gpio {
 public:
-  enum class Mode { Input, Output, InputOutput };
-  enum class Pull { None, Up, Down };
-  enum class IntrType { Disable, Rising, Falling, AnyEdge };
-  enum class Level { High = 1, Low = 0 };
+  Gpio() = delete;
 
-  explicit Gpio(const int pin);
-  ~Gpio();
+  [[nodiscard]] static std::expected<void, GpioError> Init() {
+    if (!hal::Init(config)) {
+      return std::unexpected(GpioError::InitFailed);
+    }
+    return {};
+  }
 
-  bool Init(Mode mode, Pull pull = Pull::None,
-            IntrType intrType = IntrType::Disable);
+  static constexpr GpioConfig Config = config;
 
-  void SetLevel(Level level);
-  Level GetLevel() const;
+  static void SetLevel(Level level)
+    requires OutputCapable<config>
+  {
+    hal::SetLevel(config.mPin, level);
+  }
 
-  void OnInterrupt(std::function<void()> callback);
-
-private:
-  const int mPin;
-  std::function<void()> mIsrCallback;
-
-  static void IsrRouter(void *arg);
+  [[nodiscard]] static Level GetLevel()
+    requires InputCapable<config>
+  {
+    return hal::GetLevel(config.mPin);
+  }
 };
 
-} // namespace sillbird
+} // namespace sillbird::gpio
