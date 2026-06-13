@@ -23,4 +23,16 @@ namespace stepperMotor {
 enum class MoveTypes { WAVE, HALF, FULL };
 }
 
+enum class HardwareError { Ok, InitFailed, InvalidPin, BusError };
+
+namespace i2c {
+struct I2cConfig {
+  uint8_t port;
+  uint8_t sdaPin;
+  uint8_t sclPin;
+  uint32_t freqHz;
+};
+
+} // namespace i2c
+
 } // namespace sillbird

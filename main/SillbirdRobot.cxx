@@ -1,4 +1,7 @@
+#include "I2cBus.hxx"
+#include "Types.hxx"
 #include <Gpio.hxx>
+#include <LCD.hxx>
 #include <StepperMotor.hxx>
 #include <cstdlib>
 #include <esp_log.h>
@@ -19,6 +22,9 @@ constexpr GpioConfig mototPin1{.mPin = 25, .mMode = Mode::Output};
 constexpr GpioConfig mototPin2{.mPin = 26, .mMode = Mode::Output};
 constexpr GpioConfig mototPin3{.mPin = 27, .mMode = Mode::Output};
 constexpr GpioConfig mototPin4{.mPin = 14, .mMode = Mode::Output};
+
+constexpr i2c::I2cConfig mainI2cConfig{
+    .port = 0, .sdaPin = 23, .sclPin = 22, .freqHz = 100000};
 } // namespace sillbird
 
 namespace sg = sillbird::gpio;
@@ -28,26 +34,44 @@ using Motor = sillbird::StepperMotor<
     sg::Gpio<sillbird::mototPin1>, sg::Gpio<sillbird::mototPin2>,
     sg::Gpio<sillbird::mototPin3>, sg::Gpio<sillbird::mototPin4>>;
 
+using MainBus = sillbird::i2c::I2cBus<sillbird::mainI2cConfig>;
+using Display = sillbird::lcd::Lcd<MainBus, std::byte{0x27}>;
+
 class Application final {
 public:
   Application(Motor motor) : mMotor(motor) {}
-  std::expected<void, sillbird::gpio::GpioError> setup() {
-    using namespace sillbird::gpio;
+  std::expected<void, sillbird::HardwareError> setup() {
+    using namespace sillbird;
     if (!gLed::Init()) {
       ESP_LOGI(__func__, "Init GPIO led: Failed");
-      return std::unexpected(GpioError::InitFailed);
+      return std::unexpected(HardwareError::InitFailed);
     }
     ESP_LOGI(__func__, "Init GPIO led: Success");
     if (!gButton::Init()) {
       ESP_LOGI(__func__, "Init GPIO button: Failed");
-      return std::unexpected(GpioError::InitFailed);
+      return std::unexpected(HardwareError::InitFailed);
     }
     ESP_LOGI(__func__, "Init GPIO button: Success");
+
+    if (!MainBus::Init()) {
+      ESP_LOGI(__func__, "Init I2C Bus: Failed");
+      return std::unexpected(HardwareError::InitFailed);
+    }
+    ESP_LOGI(__func__, "Init I2C Bus: Success");
+
+    if (!Display::Init()) {
+      ESP_LOGI(__func__, "Init LCD: Failed");
+      return std::unexpected(HardwareError::InitFailed);
+    }
+    ESP_LOGI(__func__, "Init LCD: Success");
+
     return {};
   }
 
   void run() {
     using namespace sillbird::gpio;
+    Display::Clear();
+    Display::Print(" System Ready!");
     while (true) {
       if (gButton::GetLevel() == Level::Low) {
         gLed::SetLevel(Level::High);
